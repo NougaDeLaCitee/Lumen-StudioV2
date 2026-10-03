@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immersive Lamp Studio</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        roomDark: '#090a0f',
+                        roomLight: '#f3f4f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.5s ease, color 0.5s ease;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        /* Custom lamp glow effects */
+        .lamp-glow {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        /* Lava lamp blob animation */
+        @keyframes blob1 {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-40px) scale(1.2, 0.8); }
+        }
+        @keyframes blob2 {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-60px) scale(0.9, 1.3); }
+        }
+        @keyframes blob3 {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-30px) scale(1.1, 0.9); }
+        }
+        .animate-blob1 { animation: blob1 7s infinite ease-in-out; }
+        .animate-blob2 { animation: blob2 9s infinite ease-in-out; }
+        .animate-blob3 { animation: blob3 5s infinite ease-in-out; }
+
+        /* Neon flicker */
+        @keyframes neonFlicker {
+            0%, 19.999%, 22%, 62.999%, 64%, 64.999%, 70%, 100% {
+                opacity: 0.99;
+                filter: drop-shadow(0 0 15px currentColor) drop-shadow(0 0 30px currentColor);
+            }
+            20%, 21.999%, 63%, 63.999%, 65%, 69.999% {
+                opacity: 0.4;
+                filter: none;
+            }
+        }
+        .neon-active {
+            animation: neonFlicker 4s infinite;
+        }
+
+        /* Chandelier sparkle */
+        @keyframes sparkle {
+            0%, 100% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.15); filter: brightness(1.3); }
+        }
+        .sparkle-effect {
+            animation: sparkle 2s infinite ease-in-out;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body id="appBody" class="bg-roomDark text-slate-100 min-h-screen flex flex-col overflow-x-hidden">
+
+    <header class="w-full border-b border-white/10 backdrop-blur-md bg-black/30 sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center shadow-lg shadow-amber-500/30 text-black font-bold text-xl">
+                <i class="fa-solid fa-lightbulb"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight tracking-wide">LumenStudio</h1>
+                <p class="text-xs text-slate-400">Interactive Lighting Collection</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <!-- Room Ambient Toggle -->
+            <button id="roomModeBtn" onclick="toggleRoomMode()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium flex items-center space-x-2 transition">
+                <i id="roomModeIcon" class="fa-solid fa-moon"></i>
+                <span id="roomModeText" class="hidden sm:inline">Dark Room</span>
+            </button>
+            <!-- Audio Toggle -->
+            <button id="audioToggleBtn" onclick="toggleAudio()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium flex items-center space-x-2 transition">
+                <i id="audioIcon" class="fa-solid fa-volume-xmark text-slate-400"></i>
+                <span class="hidden sm:inline">SFX</span>
+            </button>
+            <!-- Master Light Switch -->
+            <button onclick="toggleMasterPower()" id="masterPowerBtn" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs flex items-center space-x-2 shadow-lg shadow-amber-500/20 transition">
+                <i class="fa-solid fa-power-off"></i>
+                <span>Master Power</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+        
+        <!-- Left / Center: Interactive Stage Room -->
+        <div id="roomContainer" class="flex-1 relative flex flex-col items-center justify-center p-6 lg:p-12 min-h-[500px] lg:min-h-auto transition-colors duration-700">
+            
+            <!-- Ambient room background glow corresponding to active lamp -->
+            <div id="roomAmbientGlow" class="absolute inset-0 pointer-events-none transition-all duration-500 opacity-0"></div>
+
+            <!-- Floor shadow & reflection -->
+            <div id="roomFloor" class="absolute bottom-0 w-full h-32 bg-gradient-to-t from-black/40 to-transparent pointer-events-none transition-colors duration-500"></div>
+
+            <!-- Active Lamp Display Canvas / Stage -->
+            <div class="relative z-10 flex flex-col items-center justify-center w-full max-w-lg cursor-pointer group" onclick="toggleActiveLampPower()">
+                <div id="lampStage" class="relative transition-transform duration-300 group-hover:scale-105">
+                    <!-- Lamp Rendered dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Quick click hint -->
+            <div class="absolute bottom-6 z-20 px-4 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-xs text-slate-300 flex items-center space-x-2 pointer-events-none">
+                <i class="fa-solid fa-hand-pointer text-amber-400 animate-bounce"></i>
+                <span>Click lamp or switch to turn on/off</span>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: Lamp Selector & Controls -->
+        <aside class="w-full lg:w-96 bg-black/40 backdrop-blur-xl border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col h-auto lg:h-[calc(100vh-65px)] z-30">
+            
+            <!-- Tabs or header -->
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 class="font-semibold text-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-amber-400"></i>
+                    <span>Lamp Catalog & Controls</span>
+                </h2>
+                <span id="activeLampBadge" class="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Vintage Edison</span>
+            </div>
+
+            <!-- Scrollable Controls Content -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-6">
+                
+                <!-- Lamp Selector Grid -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Choose Lamp Model</label>
+                    <div id="lampSelectorGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2.5">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Customization Panel -->
+                <div class="space-y-4 pt-2 border-t border-white/10">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-slate-400 uppercase tracking-wider">Lamp Settings</label>
+                        <button onclick="resetLampSettings()" class="text-xs text-slate-400 hover:text-white transition">Reset</button>
+                    </div>
+
+                    <!-- Power Switch Toggle button -->
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                        <div class="flex items-center space-x-3">
+                            <div id="controlPowerIconBox" class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                                <i class="fa-solid fa-lightbulb"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-medium">Power Status</h3>
+                                <p id="controlPowerStatusText" class="text-xs text-slate-400">ON</p>
+                            </div>
+                        </div>
+                        <button onclick="toggleActiveLampPower()" id="catalogPowerBtn" class="w-12 h-6 rounded-full bg-amber-500 relative transition-colors duration-200 focus:outline-none">
+                            <div id="catalogPowerKnob" class="absolute top-1 left-7 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-200"></div>
+                        </button>
+                    </div>
+
+                    <!-- Brightness / Dimmer Slider -->
+                    <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-300 font-medium flex items-center space-x-2">
+                                <i class="fa-solid fa-sun text-amber-400"></i>
+                                <span>Brightness</span>
+                            </span>
+                            <span id="brightnessVal" class="text-amber-400 font-mono font-semibold">100%</span>
+                        </div>
+                        <input type="range" id="brightnessSlider" min="10" max="100" value="100" oninput="updateBrightness(this.value)" class="w-full accent-amber-500 cursor-pointer h-1.5 bg-white/20 rounded-lg">
+                    </div>
+
+                    <!-- Color Picker -->
+                    <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-300 font-medium flex items-center space-x-2">
+                                <i class="fa-solid fa-palette text-amber-400"></i>
+                                <span>Bulb / Neon Color</span>
+                            </span>
+                            <span id="colorHexText" class="font-mono text-xs text-slate-400">#ffaa33</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <input type="color" id="colorPicker" value="#ffaa33" oninput="updateColor(this.value)" class="w-10 h-8 rounded bg-transparent cursor-pointer border border-white/20">
+                            <div class="flex-1 grid grid-cols-6 gap-1.5">
+                                <button onclick="setPresetColor('#ffaa33')" class="w-full h-6 rounded bg-amber-500 hover:scale-105 transition"></button>
+                                <button onclick="setPresetColor('#ff4444')" class="w-full h-6 rounded bg-red-500 hover:scale-105 transition"></button>
+                                <button onclick="setPresetColor('#33ccff')" class="w-full h-6 rounded bg-cyan-400 hover:scale-105 transition"></button>
+                                <button onclick="setPresetColor('#9933ff')" class="w-full h-6 rounded bg-purple-500 hover:scale-105 transition"></button>
+                                <button onclick="setPresetColor('#33ff66')" class="w-full h-6 rounded bg-emerald-400 hover:scale-105 transition"></button>
+                                <button onclick="setPresetColor('#ffffff')" class="w-full h-6 rounded bg-white hover:scale-105 transition"></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lamp Description & Specs -->
+                    <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1">
+                        <h4 id="lampInfoTitle" class="text-xs font-semibold text-amber-400">Vintage Edison Bulb</h4>
+                        <p id="lampInfoDesc" class="text-xs text-slate-400 leading-relaxed">A classic warm-glow filament lamp designed for rustic ambiance and timeless charm.</p>
+                    </div>
+
+                </div>
+
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        // Audio Synthesizer for interactive feedback (Click, Switch, Hum)
+        let audioEnabled = false;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioEnabled) return;
+            try {
+                initAudio();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'click') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.05);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'switch') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(250, now);
+                    osc.frequency.setValueAtTime(500, now + 0.03);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                }
+            } catch (e) {
+                console.log('Audio playback prevented or not supported', e);
+            }
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const icon = document.getElementById('audioIcon');
+            if (audioEnabled) {
+                initAudio();
+                icon.className = 'fa-solid fa-volume-high text-amber-400';
+                playSound('click');
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-slate-400';
+            }
+        }
+
+        // Lamp Database Definitions
+        const lamps = [
+            {
+                id: 'edison',
+                name: 'Vintage Edison',
+                icon: 'fa-lightbulb',
+                desc: 'A classic warm-glow filament bulb designed for rustic ambiance and timeless charm.',
+                defaultColor: '#ffaa33',
+                render: (on, color, brightness) => {
+                    const glowOpacity = on ? (brightness / 100) : 0;
+                    return `
+                        <div class="flex flex-col items-center">
+                            <!-- Hanging wire -->
+                            <div class="w-1.5 h-24 bg-gradient-to-b from-stone-700 to-stone-500"></div>
+                            <!-- Brass Socket -->
+                            <div class="w-10 h-8 bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-700 rounded-sm shadow-md relative z-10 flex flex-col justify-between p-0.5">
+                                <div class="w-full h-1 bg-black/30 rounded-full"></div>
+                                <div class="w-full h-1 bg-black/30 rounded-full"></div>
+                            </div>
+                            <!-- Bulb Glass (Pear shape) -->
+                            <div class="relative w-36 h-48 rounded-t-full rounded-b-[45%] border-2 border-white/30 backdrop-blur-sm flex items-center justify-center transition-all duration-300"
+                                 style="background: ${on ? `radial-gradient(circle at 50% 40%, ${color}ff 0%, ${color}66 50%, rgba(255,255,255,0.1) 90%)` : 'rgba(255,255,255,0.05)'};
+                                 box-shadow: ${on ? `0 0 ${60 * (brightness/100)}px ${20 * (brightness/100)}px ${color}aa, inset 0 0 25px rgba(255,255,255,0.5)` : 'none'}">
+                                <!-- Filament -->
+                                <div class="relative w-12 h-20 flex items-center justify-center">
+                                    <div class="absolute inset-0 border-2 border-amber-200 rounded-t-full rounded-b-lg opacity-80 ${on ? 'brightness-125' : 'brightness-50'}"
+                                         style="box-shadow: ${on ? `0 0 10px ${color}` : 'none'}"></div>
+                                    <div class="w-2 h-10 bg-amber-200 ${on ? 'shadow-[0_0_15px_#fff]' : ''}"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+            {
+                id: 'lava',
+                name: 'Lava Lamp',
+                icon: 'fa-flask',
+                desc: 'A groovy retro lava lamp with undulating organic wax blobs floating in fluid motion.',
+                defaultColor: '#ff3366',
+                render: (on, color, brightness) => {
+                    const glowOpacity = on ? (brightness / 100) : 0;
+                    return `
+                        <div class="flex flex-col items-center">
+                            <!-- Top Cap -->
+                            <div class="w-12 h-8 bg-zinc-700 rounded-t-xl shadow-md border-b border-zinc-900"></div>
+                            <!-- Glass Cylinder -->
+                            <div class="relative w-28 h-64 bg-zinc-900/60 rounded-3xl border-2 border-white/20 overflow-hidden backdrop-blur-sm flex flex-col justify-end p-2 transition-all duration-300"
+                                 style="box-shadow: ${on ? `0 0 ${50 * (brightness/100)}px ${color}88, inset 0 0 20px ${color}44` : 'none'}">
+                                ${on ? `
+                                    <!-- Lava Blobs Inside -->
+                                    <div class="absolute inset-0 overflow-hidden opacity-90">
+                                        <div class="absolute bottom-4 left-4 w-16 h-20 rounded-full animate-blob1" style="background-color: ${color}; filter: blur(4px);"></div>
+                                        <div class="absolute bottom-16 right-4 w-14 h-16 rounded-full animate-blob2" style="background-color: ${color}; filter: blur(5px);"></div>
+                                        <div class="absolute bottom-28 left-6 w-12 h-16 rounded-full animate-blob3" style="background-color: ${color}; filter: blur(3px);"></div>
+                                    </div>
+                                    <!-- Liquid background tint -->
+                                    <div class="absolute inset-0 bg-gradient-to-t from-purple-950/40 to-indigo-900/20 pointer-events-none"></div>
+                                ` : '<div class="absolute inset-0 bg-black/60"></div>'}
+                            </div>
+                            <!-- Base Stand -->
+                            <div class="w-20 h-10 bg-zinc-800 rounded-b-2xl shadow-lg border-t border-zinc-700"></div>
+                        </div>
+                    `;
+                }
+            },
+            {
+                id: 'desk',
+                name: 'Modern Desk LED',
+                icon: 'fa-desktop',
+                desc: 'A sleek, adjustable architect desk lamp with crisp, clean directional illumination.',
+                defaultColor: '#33ccff',
+                render: (on, color, brightness) => {
+                    return `
+                        <div class="relative flex flex-col items-center">
+                            <!-- Lamp Head (Articulated Bar) -->
+                            <div class="relative w-36 h-6 rounded-full border border-white/30 bg-zinc-800 flex items-center justify-center shadow-lg -rotate-12 translate-x-4 -translate-y-4">
+                                <div class="w-28 h-3 rounded-full transition-all duration-300"
+                                     style="background: ${on ? color : '#444'}; box-shadow: ${on ? `0 0 ${40 * (brightness/100)}px ${color}` : 'none'}"></div>
+                            </div>
+                            <!-- Arm Link -->
+                            <div class="w-2 h-36 bg-gradient-to-r from-zinc-600 to-zinc-400 rounded-full -rotate-45 origin-bottom-right shadow-md translate-y-2"></div>
+                            <!-- Base -->
+                            <div class="w-24 h-6 bg-zinc-800 rounded-full shadow-2xl border border-white/10 mt-2"></div>
+                        </div>
+                    `;
+                }
+            },
+            {
+                id: 'neon',
+                name: 'Neon Sign',
+                icon: 'fa-bolt',
+                desc: 'An electric neon art display glowing with vibrant urban energy and pulse flicker.',
+                defaultColor: '#ff2a85',
+                render: (on, color, brightness) => {
+                    return `
+                        <div class="relative flex items-center justify-center p-8 bg-zinc-950/80 rounded-3xl border border-white/10 shadow-2xl">
+                            <!-- Neon Heart / Pulse Shape using SVG -->
+                            <div class="relative transition-all duration-300 ${on ? 'neon-active' : 'opacity-30'}"
+                                 style="color: ${on ? color : '#555'}; filter: ${on ? `drop-shadow(0 0 ${20 * (brightness/100)}px ${color})` : 'none'}">
+                                <svg class="w-36 h-36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+            {
+                id: 'lantern',
+                name: 'Paper Lantern',
+                icon: 'fa-moon',
+                desc: 'A traditional Japanese Washi paper sphere creating soft, diffused, serene ambient light.',
+                defaultColor: '#ffeedd',
+                render: (on, color, brightness) => {
+                    return `
+                        <div class="flex flex-col items-center">
+                            <!-- Top Wire -->
+                            <div class="w-1 h-12 bg-stone-600"></div>
+                            <!-- Paper Sphere -->
+                            <div class="relative w-44 h-44 rounded-full border border-amber-100/40 flex items-center justify-center transition-all duration-300"
+                                 style="background: ${on ? `radial-gradient(circle at 50% 50%, ${color}ff 0%, ${color}88 60%, rgba(255,255,255,0.2) 90%)` : '#d1c7b7'};
+                                 box-shadow: ${on ? `0 0 ${70 * (brightness/100)}px ${25 * (brightness/100)}px ${color}aa, inset 0 0 35px rgba(255,255,255,0.8)` : '0 10px 20px rgba(0,0,0,0.3)'}">
+                                <!-- Ribbing rings pattern -->
+                                <div class="absolute inset-0 rounded-full border-b-2 border-t-2 border-stone-800/20 pointer-events-none"></div>
+                                <div class="absolute inset-0 rounded-full border-l-2 border-r-2 border-stone-800/10 pointer-events-none"></div>
+                            </div>
+                            <!-- Bottom Tassel -->
+                            <div class="w-1 h-8 bg-stone-600 mt-0.5"></div>
+                        </div>
+                    `;
+                }
+            },
+            {
+                id: 'chandelier',
+                name: 'Crystal Chandelier',
+                icon: 'fa-gem',
+                desc: 'An opulent multi-tier crystal fixture radiating sparkling luxury and elegance.',
+                defaultColor: '#fff5cc',
+                render: (on, color, brightness) => {
+                    return `
+                        <div class="flex flex-col items-center">
+                            <!-- Chain -->
+                            <div class="w-1 h-16 bg-gradient-to-b from-amber-700 to-yellow-500"></div>
+                            <!-- Crown frame -->
+                            <div class="w-48 h-12 rounded-t-full border-t-4 border-amber-500 flex items-center justify-around px-4 shadow-lg">
+                                <div class="w-3 h-6 bg-amber-300 rounded-b-full ${on ? 'sparkle-effect' : ''}" style="background-color: ${on ? color : '#888'}; box-shadow: ${on ? `0 0 15px ${color}` : 'none'}"></div>
+                                <div class="w-3 h-8 bg-amber-300 rounded-b-full ${on ? 'sparkle-effect' : ''}" style="background-color: ${on ? color : '#888'}; box-shadow: ${on ? `0 0 15px ${color}` : 'none'}"></div>
+                                <div class="w-3 h-6 bg-amber-300 rounded-b-full ${on ? 'sparkle-effect' : ''}" style="background-color: ${on ? color : '#888'}; box-shadow: ${on ? `0 0 15px ${color}` : 'none'}"></div>
+                            </div>
+                            <!-- Crystal Tiers -->
+                            <div class="relative w-56 h-28 border-x-2 border-b-2 border-amber-300/40 rounded-b-full backdrop-blur-sm flex items-center justify-center transition-all duration-300"
+                                 style="background: ${on ? `radial-gradient(circle at 50% 30%, ${color}dd 0%, rgba(255,255,255,0.1) 80%)` : 'rgba(255,255,255,0.02)'};
+                                 box-shadow: ${on ? `0 0 ${80 * (brightness/100)}px ${30 * (brightness/100)}px ${color}aa` : 'none'}">
+                                <div class="text-xs text-amber-200/60 font-semibold tracking-widest uppercase">Crystal Matrix</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+            {
+                id: 'spotlight',
+                name: 'Industrial Spotlight',
+                icon: 'fa-video',
+                desc: 'A heavy-duty theatrical spotlight casting a powerful, dramatic beam of focused light.',
+                defaultColor: '#ffffcc',
+                render: (on, color, brightness) => {
+                    return `
+                        <div class="relative flex items-center">
+                            <!-- Stand Tripod Legs -->
+                            <div class="absolute top-20 w-32 h-32 border-l-2 border-r-2 border-zinc-700 pointer-events-none"></div>
+                            <!-- Spotlight Canister -->
+                            <div class="relative w-36 h-28 bg-gradient-to-r from-zinc-700 via-zinc-800 to-zinc-900 rounded-2xl border-2 border-zinc-600 shadow-2xl flex items-center justify-end pr-3 transform -rotate-12">
+                                <!-- Lens -->
+                                <div class="w-16 h-20 rounded-full border-4 border-zinc-600 flex items-center justify-center transition-all duration-300"
+                                     style="background: ${on ? color : '#333'};
+                                     box-shadow: ${on ? `0 0 ${90 * (brightness/100)}px ${40 * (brightness/100)}px ${color}` : 'none'}">
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        ];
+
+        // State Management
+        let currentLampId = 'edison';
+        let lampStates = {}; // id -> { on: boolean, brightness: number, color: string }
+        let masterPower = true;
+        let roomMode = 'dark'; // 'dark' or 'light'
+
+        // Initialize default states
+        lamps.forEach(lamp => {
+            lampStates[lamp.id] = {
+                on: true,
+                brightness: 100,
+                color: lamp.defaultColor
+            };
+        });
+
+        // DOM Elements
+        const lampStage = document.getElementById('lampStage');
+        const lampSelectorGrid = document.getElementById('lampSelectorGrid');
+        const activeLampBadge = document.getElementById('activeLampBadge');
+        const brightnessSlider = document.getElementById('brightnessSlider');
+        const brightnessVal = document.getElementById('brightnessVal');
+        const colorPicker = document.getElementById('colorPicker');
+        const colorHexText = document.getElementById('colorHexText');
+        const lampInfoTitle = document.getElementById('lampInfoTitle');
+        const lampInfoDesc = document.getElementById('lampInfoDesc');
+        const controlPowerStatusText = document.getElementById('controlPowerStatusText');
+        const controlPowerIconBox = document.getElementById('controlPowerIconBox');
+        const catalogPowerBtn = document.getElementById('catalogPowerBtn');
+        const catalogPowerKnob = document.getElementById('catalogPowerKnob');
+        const roomContainer = document.getElementById('roomContainer');
+        const roomAmbientGlow = document.getElementById('roomAmbientGlow');
+        const appBody = document.getElementById('appBody');
+        const roomModeBtn = document.getElementById('roomModeBtn');
+        const roomModeIcon = document.getElementById('roomModeIcon');
+        const roomModeText = document.getElementById('roomModeText');
+
+        // Render Selector Buttons
+        function renderSelectorGrid() {
+            lampSelectorGrid.innerHTML = '';
+            lamps.forEach(lamp => {
+                const isActive = lamp.id === currentLampId;
+                const state = lampStates[lamp.id];
+                const btn = document.createElement('button');
+                btn.className = `p-3 rounded-xl border flex flex-col items-center justify-center space-y-2 transition-all ${
+                    isActive 
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-lg shadow-amber-500/10' 
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300'
+                }`;
+                btn.onclick = () => selectLamp(lamp.id);
+                btn.innerHTML = `
+                    <div class="relative">
+                        <i class="fa-solid ${lamp.icon} text-lg"></i>
+                        ${state.on ? `<span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>` : ''}
+                    </div>
+                    <span class="text-xs font-medium text-center leading-tight">${lamp.name}</span>
+                `;
+                lampSelectorGrid.appendChild(btn);
+            });
+        }
+
+        function selectLamp(id) {
+            playSound('click');
+            currentLampId = id;
+            updateUI();
+        }
+
+        function toggleActiveLampPower() {
+            playSound('switch');
+            const state = lampStates[currentLampId];
+            state.on = !state.on;
+            updateUI();
+        }
+
+        function toggleMasterPower() {
+            playSound('switch');
+            masterPower = !masterPower;
+            const btn = document.getElementById('masterPowerBtn');
+            if (masterPower) {
+                btn.className = 'px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs flex items-center space-x-2 shadow-lg shadow-amber-500/20 transition';
+            } else {
+                btn.className = 'px-4 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-slate-300 font-semibold text-xs flex items-center space-x-2 transition';
+            }
+            updateUI();
+        }
+
+        function updateBrightness(val) {
+            const state = lampStates[currentLampId];
+            state.brightness = parseInt(val);
+            brightnessVal.textContent = val + '%';
+            updateUI(false); // skip re-render of full stage if unnecessary, or update glow
+        }
+
+        function updateColor(hex) {
+            const state = lampStates[currentLampId];
+            state.color = hex;
+            colorHexText.textContent = hex;
+            updateUI();
+        }
+
+        function setPresetColor(hex) {
+            playSound('click');
+            colorPicker.value = hex;
+            updateColor(hex);
+        }
+
+        function resetLampSettings() {
+            playSound('click');
+            const lamp = lamps.find(l => l.id === currentLampId);
+            const state = lampStates[currentLampId];
+            state.on = true;
+            state.brightness = 100;
+            state.color = lamp.defaultColor;
+            updateUI();
+        }
+
+        function toggleRoomMode() {
+            playSound('click');
+            roomMode = roomMode === 'dark' ? 'light' : 'dark';
+            if (roomMode === 'light') {
+                appBody.className = 'bg-roomLight text-slate-900 min-h-screen flex flex-col overflow-x-hidden';
+                roomContainer.classList.remove('bg-roomDark');
+                roomContainer.classList.add('bg-roomLight');
+                roomModeIcon.className = 'fa-solid fa-sun text-amber-500';
+                roomModeText.textContent = 'Bright Room';
+            } else {
+                appBody.className = 'bg-roomDark text-slate-100 min-h-screen flex flex-col overflow-x-hidden';
+                roomContainer.classList.remove('bg-roomLight');
+                roomContainer.classList.add('bg-roomDark');
+                roomModeIcon.className = 'fa-solid fa-moon';
+                roomModeText.textContent = 'Dark Room';
+            }
+        }
+
+        // Main UI Updater
+        function updateUI() {
+            const lamp = lamps.find(l => l.id === currentLampId);
+            const state = lampStates[currentLampId];
+            const effectivelyOn = masterPower && state.on;
+
+            // Render Lamp HTML
+            lampStage.innerHTML = lamp.render(effectivelyOn, state.color, state.brightness);
+
+            // Update badge & info
+            activeLampBadge.textContent = lamp.name;
+            lampInfoTitle.textContent = lamp.name;
+            lampInfoDesc.textContent = lamp.desc;
+
+            // Update controls
+            brightnessSlider.value = state.brightness;
+            brightnessVal.textContent = state.brightness + '%';
+            colorPicker.value = state.color;
+            colorHexText.textContent = state.color;
+
+            // Power button toggle UI state
+            if (state.on) {
+                controlPowerStatusText.textContent = 'ON';
+                controlPowerStatusText.className = 'text-xs text-amber-400 font-medium';
+                controlPowerIconBox.className = 'w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center';
+                catalogPowerBtn.className = 'w-12 h-6 rounded-full bg-amber-500 relative transition-colors duration-200 focus:outline-none';
+                catalogPowerKnob.style.left = '1.75rem';
+            } else {
+                controlPowerStatusText.textContent = 'OFF';
+                controlPowerStatusText.className = 'text-xs text-slate-500 font-medium';
+                controlPowerIconBox.className = 'w-8 h-8 rounded-lg bg-white/5 text-slate-500 flex items-center justify-center';
+                catalogPowerBtn.className = 'w-12 h-6 rounded-full bg-zinc-700 relative transition-colors duration-200 focus:outline-none';
+                catalogPowerKnob.style.left = '0.25rem';
+            }
+
+            // Room ambient background glow based on lamp color & brightness
+            if (effectivelyOn) {
+                roomAmbientGlow.style.opacity = (state.brightness / 100) * (roomMode === 'dark' ? 0.45 : 0.15);
+                roomAmbientGlow.style.background = `radial-gradient(circle at 50% 50%, ${state.color}aa 0%, transparent 70%)`;
+            } else {
+                roomAmbientGlow.style.opacity = '0';
+            }
+
+            renderSelectorGrid();
+        }
+
+        // Initial render on load
+        window.onload = function() {
+            updateUI();
+        };
+    </script>
+</body>
+</html>
